@@ -2,6 +2,33 @@ const { EmbedBuilder } = require("discord.js");
 const QuickChart = require('quickchart-js');
 
 /**
+ * @type {import("@structures/Command")}
+ */
+module.exports = {
+  name: "membercount",
+  description: "Shows the number of members on the server.",
+  category: "STATS",
+  botPermissions: ["EmbedLinks"],
+  command: {
+    enabled: true,
+    aliases: [],
+  },
+  slashCommand: {
+    enabled: true,
+  },
+
+  async messageRun(message) {
+    const response = await getChartEmbed(message.guild);
+    await message.safeReply(response);
+  },
+
+  async interactionRun(interaction) {
+    const response = await getChartEmbed(interaction.guild);
+    await interaction.followUp(response);
+  },
+};
+
+/**
  * @param {import("discord.js").Guild} guild 
  */
 async function getChartEmbed(guild) {
@@ -26,41 +53,20 @@ async function getChartEmbed(guild) {
         plugins: {
             title: {
                 display: true,
-                text: `${guild.name} members count`
+                text: `${guild.name} Members Count`
             }
         }
     },
   }).setWidth(500).setHeight(300).setBackgroundColor('#151515');
 
   const chartUrl = await chart.getShortUrl();
+
   const embed = new EmbedBuilder()
-    .setTitle('📊 │ Member Count')
-    .setColor('#e74c3c')  // Ensure the color is valid. Adjust if needed.
+    .setTitle(`📊 │ Member Count`)
+    .setColor('#e74c3c')  // Custom color directly in the code
     .setFooter({ text: guild.client.user.username, iconURL: guild.client.user.avatarURL() })
-    .setDescription(`Total: **${totalMembers}**\nMembers: **${humanMembers}**\nBots: **${botMembers}**\nLast 24h: **${last24Hours}**\nLast 7 days: **${last7Days}**`)
+    .setDescription(`**Total:** ${totalMembers}\n**Members:** ${humanMembers}\n**Bots:** ${botMembers}\n**Joined Last 24h:** ${last24Hours}\n**Joined Last 7 Days:** ${last7Days}`)
     .setImage(chartUrl);
 
-  return {
-    embeds: [embed]
-  };
+  return { embeds: [embed] };
 }
-
-module.exports = {
-  name: "membercount",
-  description: "Shows the number of members on the server.",
-  category: "STATS",
-  botPermissions: ["EmbedLinks"],
-  command: {
-    enabled: true,
-    aliases: [],
-  },
-  slashCommand: {
-    enabled: true
-  },
-  async messageRun(message) {
-   await message.reply(await getChartEmbed(message.guild));
-  },
-  async interactionRun(interaction) {
-    await interaction.followUp(await getChartEmbed(interaction.guild));
-  }
-};
