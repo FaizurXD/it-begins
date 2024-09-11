@@ -1,19 +1,26 @@
 const express = require('express');
-const axios = require('axios'); // Import axios for sending HTTP requests
+const axios = require('axios');
+const bodyParser = require('body-parser');
 const app = express();
-const startTime = Date.now(); // Store the time when the server started
+const startTime = Date.now();
 
-let totalRequests = 0; // Counter for total requests received
-let pingCount = 0; // Counter for successful pings
+let totalRequests = 0;
+let pingCount = 0;
 
 // Website to ping
-const websiteURL = 'https://faizur.onrender.com'; // Replace with the actual URL
+const websiteURL = 'https://faizur.onrender.com';
 
 // Middleware to count each request
 app.use((req, res, next) => {
     totalRequests++;
     next();
 });
+
+// Middleware to parse URL-encoded bodies
+app.use(bodyParser.urlencoded({ extended: true }));
+
+// Middleware to serve static files (for CSS)
+app.use(express.static(__dirname));
 
 // Function to ping the website
 const pingWebsite = async () => {
@@ -26,12 +33,101 @@ const pingWebsite = async () => {
     }
 };
 
-// Set interval to ping the website every 1 minute 35 seconds (95 seconds)
-setInterval(pingWebsite, 95 * 1000); // 95 seconds
+// Set interval to ping the website every 1 minute 35 seconds
+setInterval(pingWebsite, 95 * 1000);
+
+// Route for the login page
+app.get('/login', (req, res) => {
+    res.send(`
+        <html>
+            <head>
+                <title>Login</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        background-color: #1e1e1e;
+                        color: #e0e0e0;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    .login-container {
+                        max-width: 400px;
+                        margin: 50px auto;
+                        padding: 20px;
+                        background: #333;
+                        border-radius: 8px;
+                        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+                    }
+                    h1 {
+                        text-align: center;
+                        color: #fff;
+                    }
+                    form {
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    label {
+                        margin: 10px 0 5px;
+                    }
+                    input {
+                        padding: 10px;
+                        margin-bottom: 10px;
+                        border: 1px solid #555;
+                        border-radius: 4px;
+                        background: #222;
+                        color: #e0e0e0;
+                    }
+                    button {
+                        padding: 10px;
+                        border: none;
+                        border-radius: 4px;
+                        background: #4caf50;
+                        color: #fff;
+                        cursor: pointer;
+                    }
+                    button:hover {
+                        background: #45a049;
+                    }
+                    a {
+                        color: #4caf50;
+                    }
+                    a:hover {
+                        text-decoration: underline;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="login-container">
+                    <h1>Login</h1>
+                    <form action="/login" method="POST">
+                        <label for="username">Username:</label>
+                        <input type="text" id="username" name="username" required>
+                        <label for="password">Password:</label>
+                        <input type="password" id="password" name="password" required>
+                        <button type="submit">Login</button>
+                    </form>
+                </div>
+            </body>
+        </html>
+    `);
+});
+
+// Route to handle login
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false }).replace(':', '');
+    const validPassword = `faizur-${currentTime}`;
+    
+    if (username === 'faizur' && password === validPassword) {
+        res.redirect('/');
+    } else {
+        res.send('<h1>Invalid credentials</h1><a href="/login">Try again</a>');
+    }
+});
 
 // Route for the root URL
 app.get('/', (req, res) => {
-    const uptime = process.uptime(); // Get uptime in seconds
+    const uptime = process.uptime();
     const hours = Math.floor(uptime / 3600);
     const minutes = Math.floor((uptime % 3600) / 60);
     const seconds = Math.floor(uptime % 60);
@@ -39,10 +135,40 @@ app.get('/', (req, res) => {
     const formattedUptime = `${hours}h ${minutes}m ${seconds}s`;
 
     res.send(`
-        <h1>Bot is running</h1>
-        <p>Uptime: ${formattedUptime}</p>
-        <p>Total requests received: ${totalRequests}</p>
-        <p>Total successful pings: ${pingCount}</p>
+        <html>
+            <head>
+                <title>Bot Status</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        background-color: #1e1e1e;
+                        color: #e0e0e0;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    .status-container {
+                        max-width: 400px;
+                        margin: 50px auto;
+                        padding: 20px;
+                        background: #333;
+                        border-radius: 8px;
+                        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+                    }
+                    h1 {
+                        text-align: center;
+                        color: #fff;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="status-container">
+                    <h1>Bot is running</h1>
+                    <p>Uptime: ${formattedUptime}</p>
+                    <p>Total requests received: ${totalRequests}</p>
+                    <p>Total successful pings: ${pingCount}</p>
+                </div>
+            </body>
+        </html>
     `);
 });
 
