@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const bodyParser = require('body-parser');
+const session = require('express-session');
 const app = express();
 const startTime = Date.now();
 
@@ -22,6 +23,13 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Middleware to serve static files (for CSS)
 app.use(express.static(__dirname));
 
+// Middleware for session management
+app.use(session({
+    secret: 'secret-key', // Change this to a more secure secret in production
+    resave: false,
+    saveUninitialized: true
+}));
+
 // Function to ping the website
 const pingWebsite = async () => {
     try {
@@ -35,6 +43,15 @@ const pingWebsite = async () => {
 
 // Set interval to ping the website every 1 minute 35 seconds
 setInterval(pingWebsite, 95 * 1000);
+
+// Middleware to check login status
+const checkLogin = (req, res, next) => {
+    if (req.session.loggedIn) {
+        next();
+    } else {
+        res.redirect('/login');
+    }
+};
 
 // Route for the login page
 app.get('/login', (req, res) => {
@@ -115,10 +132,11 @@ app.get('/login', (req, res) => {
 // Route to handle login
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
-    const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false }).replace(':', '');
+    const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' }).replace(':', '');
     const validPassword = `faizur-${currentTime}`;
-    
+
     if (username === 'faizur' && password === validPassword) {
+        req.session.loggedIn = true;
         res.redirect('/');
     } else {
         res.send('<h1>Invalid credentials</h1><a href="/login">Try again</a>');
@@ -126,7 +144,7 @@ app.post('/login', (req, res) => {
 });
 
 // Route for the root URL
-app.get('/', (req, res) => {
+app.get('/', checkLogin, (req, res) => {
     const uptime = process.uptime();
     const hours = Math.floor(uptime / 3600);
     const minutes = Math.floor((uptime % 3600) / 60);
