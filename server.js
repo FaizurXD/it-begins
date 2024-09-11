@@ -113,7 +113,7 @@ async function sendNotificationToDiscord(transactionId, amount, status) {
         client.destroy();
     });
 
-    client.login(process.env.DISCORD_BOT_TOKEN);
+    client.login(process.env.DISCORD_BOT_TOKEN_2);
 }
 
 // Success and Failure Pages
