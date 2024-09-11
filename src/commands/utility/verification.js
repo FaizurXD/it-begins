@@ -34,6 +34,7 @@ module.exports = {
             .setDescription('The role that will be given to unverified users.')
             .setRequired(false))
     ),
+  category: "UTILITY", // Add the category field here
 
   async execute(interaction) {
     const channel = interaction.options.getChannel('channel');
@@ -188,4 +189,4 @@ async function awaitResponseFromUser(interaction) {
   const filter = (msg) => msg.author.id === interaction.user.id;
   const response = await interaction.channel.awaitMessages({ filter, max: 1, time: 120000, errors: ['time'] }).catch(() => null);
   return response ? response.first() : null;
-                        }
+                                                            }
