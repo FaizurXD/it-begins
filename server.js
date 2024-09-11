@@ -1,151 +1,198 @@
 const express = require('express');
-const bodyParser = require('body-parser');
-const crypto = require('crypto');
 const axios = require('axios');
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
-require('dotenv').config();
-const querystring = require('querystring');
-
+const bodyParser = require('body-parser');
+const session = require('express-session');
 const app = express();
-const port = 3000;
+const startTime = Date.now();
 
-// Middleware
-app.use(bodyParser.json());
+let totalRequests = 0;
+let pingCount = 0;
+
+// Website to ping
+const websiteURL = 'https://faizur.onrender.com';
+
+// Middleware to count each request
+app.use((req, res, next) => {
+    totalRequests++;
+    next();
+});
+
+// Middleware to parse URL-encoded bodies
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Encrypt/Decrypt functions
-const ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY, 'hex'); // Must be 32 bytes
-const IV_LENGTH = 16; // For AES, this is always 16 bytes
+// Middleware to serve static files (for CSS)
+app.use(express.static(__dirname));
 
-function encrypt(text) {
-    let iv = crypto.randomBytes(IV_LENGTH);
-    let cipher = crypto.createCipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
-    let encrypted = cipher.update(text);
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-    return iv.toString('hex') + ':' + encrypted.toString('hex');
-}
+// Middleware for session management
+app.use(session({
+    secret: 'secret-key', // Change this to a more secure secret in production
+    resave: false,
+    saveUninitialized: true
+}));
 
-function decrypt(text) {
-    let textParts = text.split(':');
-    let iv = Buffer.from(textParts.shift(), 'hex');
-    let encryptedText = Buffer.from(textParts.join(':'), 'hex');
-    let decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
-    let decrypted = decipher.update(encryptedText);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted.toString();
-}
+// Function to ping the website
+const pingWebsite = async () => {
+    try {
+        const response = await axios.get(websiteURL);
+        pingCount++;
+        console.log(`Ping #${pingCount} to ${websiteURL} successful. Status code: ${response.status}`);
+    } catch (error) {
+        console.log(`Ping #${pingCount + 1} to ${websiteURL} failed. Error: ${error.message}`);
+    }
+};
 
-// Payment Endpoint
-app.post('/payment/process', async (req, res) => {
-    const { amount, username, serverType, totalPrice, items, callbackUrl } = req.body;
+// Set interval to ping the website every 1 minute 35 seconds
+setInterval(pingWebsite, 95 * 1000);
 
-    // Encrypt the amount
-    const encryptedAmount = encrypt(amount);
-
-    // Generate the URL structure for Cryptomus
-    const queryParams = {
-        amount: encryptedAmount,
-        username,
-        serverType,
-        totalPrice,
-        items: encodeURIComponent(items),
-        callbackUrl
-    };
-
-    const baseUrl = 'https://api.cryptomus.com/v1/payment/create';
-    const fullUrl = `${baseUrl}?${querystring.stringify(queryParams)}`;
-
-    // Redirect user to payment URL
-    res.redirect(fullUrl);
-});
-
-// Encryption Endpoint
-app.post('/encrypt', (req, res) => {
-    const { amount } = req.body;
-    const encryptedAmount = encrypt(amount);
-    res.json({ encryptedAmount });
-});
-
-// Payment Callback Endpoint
-app.post('/payment/callback', async (req, res) => {
-    const { transaction_id, status, encrypted_amount } = req.body;
-
-    // Decrypt the amount
-    const decryptedAmount = decrypt(encrypted_amount);
-
-    // Notify Discord
-    await sendNotificationToDiscord(transaction_id, decryptedAmount, status);
-
-    // Redirect based on payment status
-    if (status === 'success') {
-        res.redirect(`/payment/success?tid=${transaction_id}`);
+// Middleware to check login status
+const checkLogin = (req, res, next) => {
+    if (req.session.loggedIn) {
+        next();
     } else {
-        res.redirect(`/payment/failure?tid=${transaction_id}`);
+        res.redirect('/login');
+    }
+};
+
+// Route for the login page
+app.get('/login', (req, res) => {
+    res.send(`
+        <html>
+            <head>
+                <title>Login</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        background-color: #1e1e1e;
+                        color: #e0e0e0;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    .login-container {
+                        max-width: 400px;
+                        margin: 50px auto;
+                        padding: 20px;
+                        background: #333;
+                        border-radius: 8px;
+                        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+                    }
+                    h1 {
+                        text-align: center;
+                        color: #fff;
+                    }
+                    form {
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    label {
+                        margin: 10px 0 5px;
+                    }
+                    input {
+                        padding: 10px;
+                        margin-bottom: 10px;
+                        border: 1px solid #555;
+                        border-radius: 4px;
+                        background: #222;
+                        color: #e0e0e0;
+                    }
+                    button {
+                        padding: 10px;
+                        border: none;
+                        border-radius: 4px;
+                        background: #4caf50;
+                        color: #fff;
+                        cursor: pointer;
+                    }
+                    button:hover {
+                        background: #45a049;
+                    }
+                    a {
+                        color: #4caf50;
+                    }
+                    a:hover {
+                        text-decoration: underline;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="login-container">
+                    <h1>Login</h1>
+                    <form action="/login" method="POST">
+                        <label for="username">Username:</label>
+                        <input type="text" id="username" name="username" required>
+                        <label for="password">Password:</label>
+                        <input type="password" id="password" name="password" required>
+                        <button type="submit">Login</button>
+                    </form>
+                </div>
+            </body>
+        </html>
+    `);
+});
+
+// Route to handle login
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' }).replace(':', '');
+    const validPassword = `faizur-9392`;
+
+    if (username === 'faizur' && password === validPassword) {
+        req.session.loggedIn = true;
+        res.redirect('/');
+    } else {
+        res.send('<h1>Invalid credentials</h1><a href="/login">Try again</a>');
     }
 });
 
-// Function to send notification to Discord
-async function sendNotificationToDiscord(transactionId, amount, status) {
-    const client = new Client({
-        intents: [
-            GatewayIntentBits.Guilds,
-            GatewayIntentBits.GuildMessages,
-            GatewayIntentBits.MessageContent
-        ]
-    });
+// Route for the root URL
+app.get('/', checkLogin, (req, res) => {
+    const uptime = process.uptime();
+    const hours = Math.floor(uptime / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    const seconds = Math.floor(uptime % 60);
 
-    client.once('ready', async () => {
-        const channel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID);
+    const formattedUptime = `${hours}h ${minutes}m ${seconds}s`;
 
-        if (channel) {
-            const embed = new EmbedBuilder()
-                .setTitle('Payment Notification')
-                .addFields(
-                    { name: 'Transaction ID', value: transactionId },
-                    { name: 'Amount', value: amount },
-                    { name: 'Status', value: status }
-                )
-                .setColor(status === 'success' ? 'Green' : 'Red');
-
-            await channel.send({ embeds: [embed] });
-        }
-
-        client.destroy();
-    });
-
-    client.login(process.env.DISCORD_BOT_TOKEN_2);
-}
-
-// Success and Failure Pages
-app.get('/payment/success', (req, res) => {
-    const { tid } = req.query;
     res.send(`
         <html>
-        <head><title>Payment Success</title></head>
-        <body>
-            <h1>Payment Successful</h1>
-            <p>Transaction ID: ${tid}</p>
-            <p>Your payment was successful! Thank you for your purchase.</p>
-        </body>
+            <head>
+                <title>Bot Status</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        background-color: #1e1e1e;
+                        color: #e0e0e0;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    .status-container {
+                        max-width: 400px;
+                        margin: 50px auto;
+                        padding: 20px;
+                        background: #333;
+                        border-radius: 8px;
+                        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+                    }
+                    h1 {
+                        text-align: center;
+                        color: #fff;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="status-container">
+                    <h1>Bot is running</h1>
+                    <p>Uptime: ${formattedUptime}</p>
+                    <p>Total requests received: ${totalRequests}</p>
+                    <p>Total successful pings: ${pingCount}</p>
+                </div>
+            </body>
         </html>
     `);
 });
 
-app.get('/payment/failure', (req, res) => {
-    const { tid } = req.query;
-    res.send(`
-        <html>
-        <head><title>Payment Failed</title></head>
-        <body>
-            <h1>Payment Failed</h1>
-            <p>Transaction ID: ${tid}</p>
-            <p>Unfortunately, your payment could not be processed. Please try again.</p>
-        </body>
-        </html>
-    `);
-});
-
-// Start server
-app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
+// Start the server on port 3000
+const PORT = 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+    pingWebsite(); // Initial ping when the server starts
 });
