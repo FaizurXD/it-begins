@@ -133,7 +133,7 @@ app.get('/login', (req, res) => {
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
     const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' }).replace(':', '');
-    const validPassword = `faizur-${currentTime}`;
+    const validPassword = `faizur-9392`;
 
     if (username === 'faizur' && password === validPassword) {
         req.session.loggedIn = true;
